@@ -42,9 +42,10 @@ HTML_DIR = "../questions"
 
 def save_html_file_content(resulting_html_structure_dir, directory_name, content):
     html_file_path = os.path.join(resulting_html_structure_dir, directory_name + ".html")
-    
+    print(html_file_path)
+    print(os.path.dirname(html_file_path))
     if not os.path.isdir(os.path.dirname(html_file_path)):
-        os.mkdir(os.path.dirname(html_file_path))
+        os.makedirs(os.path.dirname(html_file_path), exist_ok=True)
 
     with open(html_file_path, "w") as html_file:
         html_file.write(content.prettify())
