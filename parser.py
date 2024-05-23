@@ -219,7 +219,6 @@ def create_main_page(resulting_html_structure_dir):
             questions.append(question_link)
 
             directory.append(questions)
-            # directory.append()
 
             catalog.append(directory)
             first_file_in_dir = False
