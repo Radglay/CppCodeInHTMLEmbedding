@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/home/radglay/github_pages/html_file_content_embeding/venv"
+VIRTUAL_ENV="/home/radglay/github_pages/CppCodeInHTMLEmbeding/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
