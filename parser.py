@@ -4,7 +4,26 @@ import re
 import sys
 
 
-html_template = '''
+html_main_template = '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cpp_qa</title>
+</head>
+<body>
+<div class="content">
+    <h1>Welcome to cpp_qa website!</h1>
+    <h2>Questions:</h2>
+    <div class="catalog">
+    </div>
+</div>
+</body>
+</html>
+'''
+
+html_question_template = '''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,7 +116,7 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
         if root == cpp_sources_dir:
             continue
         
-        soup = BeautifulSoup(html_template, "html.parser")
+        soup = BeautifulSoup(html_question_template, "html.parser")
         project = soup.find_all("div", class_="project")[0]
         result_container = soup.find_all("div", class_="result-container")[0]
 
@@ -149,6 +168,26 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
         if is_dir_with_files:
             save_html_file_content(resulting_html_structure_dir, directory_name, soup)    
 
+def create_main_page(resulting_html_structure_dir):
+    main_page_path = os.path.dirname(resulting_html_structure_dir)
+    soup = BeautifulSoup(html_main_template, "html.parser")
+    catalog = soup.find_all("div", class_="catalog")[0]
+
+    for root, dirs, files in os.walk(resulting_html_structure_dir, topdown=False):
+        for name in files:
+            file_path = os.path.join(root, name)
+            question_rel_path = os.path.relpath(file_path, main_page_path)
+            
+            question_link = soup.new_tag('a')
+            question_link['class'] = 'question-link'
+            question_link['href'] = question_rel_path
+            question_link.string = question_rel_path
+            catalog.append(question_link)
+    
+    index_html = os.path.join(main_page_path, "index.html")
+    with open(index_html, "w") as index:
+        index.write(soup.prettify())
+
 
 if __name__ == "__main__":
     cpp_sources_dir = SRC_DIR
@@ -162,4 +201,5 @@ if __name__ == "__main__":
         exit(-1)
     
     create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_structure_dir)
+    create_main_page(resulting_html_structure_dir)
 
