@@ -119,6 +119,8 @@ def create_result_value(readme_content, soup):
 
 def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_structure_dir):
     for root, dirs, files in os.walk(cpp_sources_dir, topdown=False):
+        file_count = 0
+        main = ""
         is_dir_with_files = False
         if root == cpp_sources_dir:
             continue
@@ -130,6 +132,7 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
         # print(root, dirs, files)
         for name in files:
             is_dir_with_files = True
+            file_count = file_count + 1
 
             file_path = os.path.join(root, name)
 
@@ -147,7 +150,11 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
 
             file_container = soup.new_tag("div")
 
-            if name.endswith('.cpp'):
+            is_main = False
+            if name == "main.cpp":
+                file_container['class'] = 'main'
+                is_main = True
+            elif name.endswith('.cpp'):
                 file_container['class'] = 'source'
             elif name.endswith('.h') or name.endswith('.hpp'):
                 file_container['class'] = 'header'
@@ -160,9 +167,13 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
             file_name_paragraph = soup.new_tag("p")
             file_name_paragraph['class'] = 'file-name'
             file_name_paragraph.string = name
-    
+
             file_container.append(file_name_paragraph)
             file_container.append(pre)
+
+            if is_main:
+                main = file_container
+
             project.append(file_container)
 
         directory_name = os.path.relpath(root, cpp_sources_dir)
@@ -173,6 +184,7 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
         # soup.append(report_btn)
 
         if is_dir_with_files:
+            project.insert(file_count, main)
             save_html_file_content(resulting_html_structure_dir, directory_name, soup)    
 
 def create_main_page(resulting_html_structure_dir):
