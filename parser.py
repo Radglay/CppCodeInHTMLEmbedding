@@ -13,7 +13,7 @@ html_main_template = '''
     <meta http-equiv='cache-control' content='no-cache'> 
     <meta http-equiv='expires' content='0'> 
     <meta http-equiv='pragma' content='no-cache'>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="static/styles.css">
     <title>cpp_qa</title>
 </head>
 <body>
@@ -36,7 +36,7 @@ html_question_template = '''
     <meta http-equiv='cache-control' content='no-cache'> 
     <meta http-equiv='expires' content='0'> 
     <meta http-equiv='pragma' content='no-cache'>
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="/cpp_qa/static/styles.css">
     <script>
         function toggleResult(event)
         {
