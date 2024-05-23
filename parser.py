@@ -68,8 +68,8 @@ HTML_DIR = "../questions"
 
 def save_html_file_content(resulting_html_structure_dir, directory_name, content):
     html_file_path = os.path.join(resulting_html_structure_dir, directory_name + ".html")
-    print(html_file_path)
-    print(os.path.dirname(html_file_path))
+    # print(html_file_path)
+    # print(os.path.dirname(html_file_path))
     if not os.path.isdir(os.path.dirname(html_file_path)):
         os.makedirs(os.path.dirname(html_file_path), exist_ok=True)
 
@@ -193,15 +193,36 @@ def create_main_page(resulting_html_structure_dir):
     catalog = soup.find_all("div", class_="catalog")[0]
 
     for root, dirs, files in os.walk(resulting_html_structure_dir, topdown=False):
+        first_file_in_dir = True
         for name in files:
             file_path = os.path.join(root, name)
             question_rel_path = os.path.relpath(file_path, main_page_path)
-            
+            directory_path = os.path.basename(os.path.dirname(question_rel_path))
+
             question_link = soup.new_tag('a')
             question_link['class'] = 'question-link'
             question_link['href'] = question_rel_path
-            question_link.string = question_rel_path
-            catalog.append(question_link)
+            question_link.string = os.path.basename(file_path)                
+
+            if first_file_in_dir:
+                directory = soup.new_tag('div')
+                directory['class'] = 'directory'
+
+                directory_title = soup.new_tag('div')
+                directory_title['class'] = 'directory_title'
+                directory_title.string = directory_path
+                directory.append(directory_title)
+
+                questions = soup.new_tag('div')
+                questions['class'] = 'questions'
+
+            questions.append(question_link)
+
+            directory.append(questions)
+            # directory.append()
+
+            catalog.append(directory)
+            first_file_in_dir = False
     
     index_html = os.path.join(main_page_path, "index.html")
     with open(index_html, "w") as index:
