@@ -22,8 +22,8 @@ html_main_template = '''
 <div class="content">
     <h1>Welcome to cpp_qa website!</h1>
     <h2>Questions:</h2>
-    <div class="catalog">
-    </div>
+    <ul class="catalog">
+    </ul>
 </div>
 </body>
 </html>
@@ -183,7 +183,7 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
             save_html_file_content(resulting_html_structure_dir, directory_name, soup)    
 
 def check_common_path(dirs, soup):
-    catalog = soup.find_all("div", class_="catalog")[0]
+    catalog = soup.find_all('ul', class_="catalog")[0]
 
     existing_directories = catalog.find_all('div', class_='directory')
     if len(existing_directories) == 0:
@@ -201,7 +201,7 @@ def check_common_path(dirs, soup):
             path_to_create_max = path_to_create
 
     
-    print(common_path_max, path_to_create_max)
+    # print(common_path_max, path_to_create_max)
     sub_dirs = os.path.split(common_path_max)
     # get this path !
     parent_directories = catalog.findChildren('div', class_='directory', recursive=False)
@@ -220,7 +220,7 @@ def check_common_path(dirs, soup):
 
 
 def create_sub_directories(resulting_html_structure_dir, file_path, soup):
-    catalog = soup.find_all("div", class_="catalog")[0]
+    catalog = soup.find_all('ul', class_="catalog")[0]
 
     dirs = os.path.relpath(os.path.dirname(file_path), resulting_html_structure_dir)
 
@@ -232,21 +232,20 @@ def create_sub_directories(resulting_html_structure_dir, file_path, soup):
     questions = soup.new_tag('div')
     questions['class'] = 'questions'
 
+    print(file_path)
     if path_to_create == "." and common_parent:
-        common_parent.append(questions)
+        print(dirs)
+        print(common_parent.prettify())
+        ul = common_parent.findChildren('ul', resursive=False)[0]
+        ul.append(questions)
+
         return
-
-    if common_parent:
-        print(common_parent['class'])
-
-    print("to create", path_to_create)
 
     child_directory = None
     file_containing_directory = None
 
     SOURCES_STRUCTURE.append(dirs)
 
-    print(file_path, path_to_create)
     while path_to_create:
         current_dir = os.path.basename(path_to_create)
         path_to_create = os.path.dirname(path_to_create)
@@ -258,8 +257,11 @@ def create_sub_directories(resulting_html_structure_dir, file_path, soup):
         directory_title.string = current_dir
         directory.append(directory_title)
 
+        ul = soup.new_tag('ul')
+        directory.append(ul)
+
         if child_directory:
-            directory.append(child_directory)
+            ul.append(child_directory)
 
         if child_directory == None:
             file_containing_directory = directory
@@ -267,16 +269,18 @@ def create_sub_directories(resulting_html_structure_dir, file_path, soup):
         child_directory = directory
 
     if common_parent:
-        common_parent.append(child_directory)
+        ul = common_parent.findChildren('ul')[0]
+        ul.append(child_directory)
     else:
         catalog.append(child_directory)
 
-    file_containing_directory.append(questions)
+    ul = file_containing_directory.find_all('ul')[0]
+    ul.append(questions)
 
 def create_main_page(resulting_html_structure_dir):
     main_page_path = os.path.dirname(resulting_html_structure_dir)
     soup = BeautifulSoup(html_main_template, "html.parser")
-    catalog = soup.find_all("div", class_="catalog")[0]
+    catalog = soup.find_all('ul', class_="catalog")[0]
 
     for root, dirs, files in os.walk(resulting_html_structure_dir, topdown=False):
         first_file_in_dir = True
