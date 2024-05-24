@@ -4,6 +4,8 @@ import re
 import sys
 
 
+SOURCES_STRUCTURE = []
+
 html_main_template = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -90,13 +92,6 @@ def create_godbolt_link(readme_content, soup):
     godbolt_link['href'] = result.group(4)
     godbolt_link.string = 'online-compiler-link'
     return godbolt_link
-
-# def create_result_img(readme_content, soup):
-#     result = re.search("([\* ])*(result)([\* ])*:[ ]*.*(https:\/\/github\.com.*?(?=\)))", readme_content)
-#     result_img = soup.new_tag("img")
-#     result_img['class'] = 'result-img'
-#     result_img['src'] = result.group(4)
-#     return result_img
 
 def create_result_value(readme_content, soup):
     result_value = soup.new_tag('div')
@@ -187,6 +182,97 @@ def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_struc
             project.insert(file_count, main)
             save_html_file_content(resulting_html_structure_dir, directory_name, soup)    
 
+def check_common_path(dirs, soup):
+    catalog = soup.find_all("div", class_="catalog")[0]
+
+    existing_directories = catalog.find_all('div', class_='directory')
+    if len(existing_directories) == 0:
+        return (None, None)
+    
+    common_path_max = '.'
+    path_to_create_max = '.'
+    for existing_path in SOURCES_STRUCTURE:
+        common_path = os.path.commonpath([existing_path, dirs])
+        path_to_create = os.path.relpath(dirs, common_path)
+
+        if len(common_path) > len(common_path_max):
+            common_path_max = common_path
+        if len(path_to_create) > len(path_to_create_max):
+            path_to_create_max = path_to_create
+
+    
+    print(common_path_max, path_to_create_max)
+    sub_dirs = os.path.split(common_path_max)
+    # get this path !
+    parent_directories = catalog.findChildren('div', class_='directory', recursive=False)
+
+    current_level_directories = catalog.findChildren('div', class_='directory', recursive=False)
+    last_parent = None
+    for sub_dir in sub_dirs:
+        for parent in current_level_directories:
+            directory_title = parent.findChildren('div', class_='directory_title', resursive=False)[0]
+            if directory_title.string == sub_dir:
+                current_level_directories = parent.findChildren('div', class_='directory', resursive=False)
+                last_parent = parent
+                break
+    
+    return (last_parent, path_to_create_max)
+
+
+def create_sub_directories(resulting_html_structure_dir, file_path, soup):
+    catalog = soup.find_all("div", class_="catalog")[0]
+
+    dirs = os.path.relpath(os.path.dirname(file_path), resulting_html_structure_dir)
+
+    (common_parent, path_to_create) = check_common_path(dirs, soup)
+    if path_to_create == None:
+        path_to_create = dirs
+    
+
+    questions = soup.new_tag('div')
+    questions['class'] = 'questions'
+
+    if path_to_create == "." and common_parent:
+        common_parent.append(questions)
+        return
+
+    if common_parent:
+        print(common_parent['class'])
+
+    print("to create", path_to_create)
+
+    child_directory = None
+    file_containing_directory = None
+
+    SOURCES_STRUCTURE.append(dirs)
+
+    print(file_path, path_to_create)
+    while path_to_create:
+        current_dir = os.path.basename(path_to_create)
+        path_to_create = os.path.dirname(path_to_create)
+        directory = soup.new_tag('div')
+        directory['class'] = 'directory'
+
+        directory_title = soup.new_tag('div')
+        directory_title['class'] = 'directory_title'
+        directory_title.string = current_dir
+        directory.append(directory_title)
+
+        if child_directory:
+            directory.append(child_directory)
+
+        if child_directory == None:
+            file_containing_directory = directory
+        
+        child_directory = directory
+
+    if common_parent:
+        common_parent.append(child_directory)
+    else:
+        catalog.append(child_directory)
+
+    file_containing_directory.append(questions)
+
 def create_main_page(resulting_html_structure_dir):
     main_page_path = os.path.dirname(resulting_html_structure_dir)
     soup = BeautifulSoup(html_main_template, "html.parser")
@@ -194,33 +280,30 @@ def create_main_page(resulting_html_structure_dir):
 
     for root, dirs, files in os.walk(resulting_html_structure_dir, topdown=False):
         first_file_in_dir = True
+        directory = None
         for name in files:
             file_path = os.path.join(root, name)
+
             question_rel_path = os.path.relpath(file_path, main_page_path)
-            directory_path = os.path.basename(os.path.dirname(question_rel_path))
+            directory_name = os.path.basename(os.path.dirname(question_rel_path))
+
+            question = soup.new_tag("div")
+            question['class'] = 'q'
 
             question_link = soup.new_tag('a')
             question_link['class'] = 'question-link'
             question_link['href'] = question_rel_path
-            question_link.string = os.path.basename(file_path)                
+            question_link.string = os.path.basename(file_path)  
+
+            question.append(question_link)              
 
             if first_file_in_dir:
-                directory = soup.new_tag('div')
-                directory['class'] = 'directory'
+                create_sub_directories(resulting_html_structure_dir, file_path, soup)
 
-                directory_title = soup.new_tag('div')
-                directory_title['class'] = 'directory_title'
-                directory_title.string = directory_path
-                directory.append(directory_title)
 
-                questions = soup.new_tag('div')
-                questions['class'] = 'questions'
+            questions = soup.find_all('div', class_='questions')[-1]
+            questions.append(question)
 
-            questions.append(question_link)
-
-            directory.append(questions)
-
-            catalog.append(directory)
             first_file_in_dir = False
     
     index_html = os.path.join(main_page_path, "index.html")
