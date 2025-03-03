@@ -2,98 +2,108 @@ from bs4 import BeautifulSoup
 import os
 import re
 import sys
+from pathlib import Path
 
 
-SOURCES_STRUCTURE = []
-
-html_main_template = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv='cache-control' content='no-cache'> 
-    <meta http-equiv='expires' content='0'> 
-    <meta http-equiv='pragma' content='no-cache'>
-    <link rel="stylesheet" href="static/styles.css">
-    <title>cpp_qa</title>
-</head>
-<body>
-<div class="content">
-    <h1>Welcome to cpp_qa website!</h1>
-    <h2>Questions:</h2>
-    <ul class="catalog">
-    </ul>
-</div>
-</body>
-</html>
-'''
-
-html_question_template = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv='cache-control' content='no-cache'> 
-    <meta http-equiv='expires' content='0'> 
-    <meta http-equiv='pragma' content='no-cache'>
-    <link rel="stylesheet" href="/cpp_qa/static/styles.css">
-    <script>
-        function toggleResult(event)
-        {
-            const parentNode = event.target.parentNode;
-            let preTag = parentNode.getElementsByTagName("pre")[0];
-
-            if (preTag.style.display == "none") {
-                preTag.style.display = "block";
-            } else {
-                preTag.style.display = "none";
-            }
-
-        }
-    </script>
-    <title></title>
-</head>
-<body>
-<div class="content">
-    <div class="project"></div>
-    <div class="result-container"></div>
-</div>
-</body>
-</html>
-'''
-
-SRC_DIR = "../src"
-HTML_DIR = "../questions"
+soup = BeautifulSoup()
 
 
-def save_html_file_content(resulting_html_structure_dir, directory_name, content):
-    html_file_path = os.path.join(resulting_html_structure_dir, directory_name + ".html")
-    # print(html_file_path)
-    # print(os.path.dirname(html_file_path))
-    if not os.path.isdir(os.path.dirname(html_file_path)):
-        os.makedirs(os.path.dirname(html_file_path), exist_ok=True)
+SOURCES_STRUCTURE = {}
 
-    with open(html_file_path, "w") as html_file:
-        html_file.write(content.prettify())
+SRC_DIR = "src"
+HTML_DIR = "questions"
 
-def parse_readme(readme_file_path, result_container, soup):
+
+def update_sources_structure(file_path):
+    global SOURCES_STRUCTURE
+    current_dict = SOURCES_STRUCTURE
+
+    dirs = file_path.split(os.sep)
+    file_name = dirs.pop()
+
+    for dir_name in dirs:
+        if dir_name not in current_dict.keys():
+            current_dict[dir_name] = {}
+
+        current_dict = current_dict[dir_name]
+    
+
+    if file_name.endswith(".cpp"):
+        if "sources" not in current_dict.keys():
+            current_dict["sources"] = []        
+        current_dict["sources"].append(file_name)
+
+    elif file_name.endswith(".md"):
+        if "md" not in current_dict.keys():
+            current_dict["md"] = []
+        current_dict["md"].append(file_name)
+
+    elif file_name.endswith(".h") or file_name.endswith(".hpp"):
+        if "headers" not in current_dict.keys():
+            current_dict["headers"] = []
+        current_dict["headers"].append(file_name)
+
+    elif file_name.endswith(".txt"):
+        if "text" not in current_dict.keys():
+            current_dict["text"] = []
+        current_dict["text"].append(file_name)
+
+
+def is_question(dictionary):
+    return "sources" in dictionary.keys() or\
+           "md" in dictionary.keys() or\
+           "headers" in dictionary.keys() or\
+           "text" in dictionary.keys()
+
+
+def create_question(dir_name, question_path):
+    question = soup.new_tag("li")
+    question['class'] = 'question'
+    question['style'] = 'margin-left:1em;'
+
+    link = soup.new_tag('a')
+    link.string = dir_name
+    link['href'] = question_path
+
+    question.append(link)
+    return question
+
+
+def create_directory(dir_name):
+    directory = soup.new_tag("div")
+    directory['class'] = 'directory'
+
+    directory_name = soup.new_tag("div")
+    directory_name['class'] = 'directory-name'
+    directory_name['onclick'] = 'toggleDirectory(event)'
+    directory_name.string = dir_name
+
+    directory_content = soup.new_tag("ul")
+    directory_content['class'] = 'directory-content'
+    directory_content['style'] = 'list-style: none;'
+   
+    directory.append(directory_name)
+    directory.append(directory_content)
+    return directory
+
+
+def parse_readme(readme_file_path, result_container):
     with open(readme_file_path) as readme:
         content = readme.read()
-        result_container.append(create_godbolt_link(content, soup))
-        # result_container.append(create_result_img(content, soup))
-        result_container.append(create_result_value(content, soup))
+        result_container.append(create_godbolt_link(content))
+        result_container.append(create_result_value(content))
 
-def create_godbolt_link(readme_content, soup):
-    result = re.search("([\* ])*(godbolt)([\* ])*:[ ]*(https:\/\/godbolt\.org.*)", readme_content)
+
+def create_godbolt_link(readme_content):
+    result = re.search("(\*\*godbolt\*\*:)([ ]*)([\s\S]*)", readme_content)
     godbolt_link = soup.new_tag("a")
     godbolt_link['class'] = 'online-compiler-link'
-    godbolt_link['href'] = result.group(4)
+    godbolt_link['href'] = result.group(3)
     godbolt_link.string = 'online-compiler-link'
     return godbolt_link
 
-def create_result_value(readme_content, soup):
+
+def create_result_value(readme_content):
     result_value = soup.new_tag('div')
     result_value['class'] = 'result-value'
 
@@ -101,8 +111,11 @@ def create_result_value(readme_content, soup):
     result_title.string = 'Result:'
     result_title['class'] = 'result-title'
     result_title['onclick'] = 'toggleResult(event)'
+    result_title['style'] = 'color:white;'
+    result_title['style'] += 'background-color: rgb(42, 41, 41);'
+    result_title['style'] += 'width: 100ch;'
    
-    result = re.search("(```)([ ]*\n)([\s\S]*?)(?=```)", readme_content)
+    result = re.search("(\*\*result\*\*:)([ \n]*)([\s\S]*?)(?=\*\*godbolt\*\*)", readme_content)
     pre = soup.new_tag('pre')
     pre['style'] = 'display: none'
     pre.string = result.group(3)
@@ -112,220 +125,221 @@ def create_result_value(readme_content, soup):
 
     return result_value
 
-def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_structure_dir):
-    for root, dirs, files in os.walk(cpp_sources_dir, topdown=False):
-        file_count = 0
-        main = ""
-        is_dir_with_files = False
-        if root == cpp_sources_dir:
-            continue
-        
-        soup = BeautifulSoup(html_question_template, "html.parser")
-        project = soup.find_all("div", class_="project")[0]
-        result_container = soup.find_all("div", class_="result-container")[0]
 
-        # print(root, dirs, files)
-        for name in files:
-            is_dir_with_files = True
-            file_count = file_count + 1
+def get_code_file_content(file_path):
+    pre = soup.new_tag("pre")
+    code = soup.new_tag("code")
 
-            file_path = os.path.join(root, name)
+    with open(file_path) as file:
+        code.string = file.read().strip()
+    pre.append(code)
 
-            if name == "README.md":
-                parse_readme(file_path, result_container, soup)
-                continue
-
-            pre = soup.new_tag("pre")
-            code = soup.new_tag("code")
-
-            with open(file_path) as file:
-                code.string = file.read().strip()
-            pre.append(code)
+    return pre
 
 
+def generate_question_html(html_file_path, cpp_sources_dir, dictionary):
+    dirname = os.path.dirname(html_file_path)
+    basename = os.path.basename(html_file_path)
+    final_dir = os.path.splitext(basename)[0]
+    source_dir = os.path.join(dirname, final_dir).replace("questions", cpp_sources_dir)
+
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname, exist_ok=True)
+
+    html = soup.new_tag("html")
+    head = soup.new_tag("head")
+    script = soup.new_tag("script")
+    script.string = '''
+    function toggleResult(event)
+    {
+        const parentNode = event.target.parentNode;
+        let preTag = parentNode.getElementsByTagName("pre")[0];
+
+        if (preTag.style.display == "none") {
+            preTag.style.display = "block";
+        } else {
+            preTag.style.display = "none";
+        }
+    }
+    '''
+
+    head.append(script)
+    html.append(head)
+
+    body = soup.new_tag("body")
+    question_file_content = soup.new_tag("div")
+
+    if "text" in dictionary.keys():
+        for file in dictionary["text"]:
             file_container = soup.new_tag("div")
 
-            is_main = False
-            if name == "main.cpp":
-                file_container['class'] = 'main'
-                is_main = True
-            elif name.endswith('.cpp'):
-                file_container['class'] = 'source'
-            elif name.endswith('.h') or name.endswith('.hpp'):
-                file_container['class'] = 'header'
-            elif name == "CMakeLists.txt":
+            text_file_path = os.path.join(source_dir, file)
+            content = get_code_file_content(text_file_path)
+            content['style'] = 'margin:0;'
+
+            if file == "CMakeLists.txt":
                 file_container['class'] = 'cmake'
-            else:
-                file_container['class'] = 'misc'
+                file_container['class'] += ' file'
+                file_container['style'] = 'border: 1px solid rgb(100, 98, 99);'
+
+                file_name_paragraph = soup.new_tag("p")
+                file_name_paragraph['class'] = 'file-name'
+                file_name_paragraph.string = file
+                file_name_paragraph['style'] = 'margin:0; color:white;'
+                file_name_paragraph['style'] += 'background-color: rgb(100, 98, 99);'
+
+                file_container.append(file_name_paragraph)
+                file_container.append(content)
+                file_container['style'] += 'padding:0; margin: 10px; width:140ch;'
+                question_file_content.append(file_container)
+
+    if "headers" in dictionary.keys():
+        for file in dictionary["headers"]:
+            file_container = soup.new_tag("div")
+
+            header_file_path = os.path.join(source_dir, file)
+            content = get_code_file_content(header_file_path)
+            content['style'] = 'margin:0;'
+
+            file_container['class'] = 'header'
             file_container['class'] += ' file'
+            file_container['style'] = 'border: 1px solid rgb(130, 27, 198);'
 
             file_name_paragraph = soup.new_tag("p")
             file_name_paragraph['class'] = 'file-name'
-            file_name_paragraph.string = name
+            file_name_paragraph.string = file
+            file_name_paragraph['style'] = 'margin:0; color:white;'
+            file_name_paragraph['style'] += 'background-color: rgb(130, 27, 198);'
 
             file_container.append(file_name_paragraph)
-            file_container.append(pre)
+            file_container.append(content)
+            file_container['style'] += 'padding:0; margin: 10px; width:140ch;'
+            question_file_content.append(file_container)
 
-            if is_main:
-                main = file_container
+    if "sources" in dictionary.keys():
+        for file in dictionary["sources"]:
+            file_container = soup.new_tag("div")
 
-            project.append(file_container)
+            src_file_path = os.path.join(source_dir, file)
+            content = get_code_file_content(src_file_path)
 
-        directory_name = os.path.relpath(root, cpp_sources_dir)
-        # button
-        # report_btn = soup.new_tag('button')
-        # report_btn['class'] = 'report'
-        # report_btn.string = 'Report'
-        # soup.append(report_btn)
+            file_name_paragraph = soup.new_tag("p")
+            file_name_paragraph['class'] = 'file-name'
+            file_name_paragraph.string = file
+            file_name_paragraph['style'] = 'margin:0; color:white;'
 
-        if is_dir_with_files:
-            project.insert(file_count, main)
-            save_html_file_content(resulting_html_structure_dir, directory_name, soup)    
+            if file == "main.cpp":
+                file_container['class'] = 'main'
+                file_container['style'] = 'border:1px solid rgb(144, 13, 13);'
+                file_name_paragraph['style'] += 'background-color: rgb(144, 13, 13);'
+            else:
+                file_container['class'] = 'source'
+                file_container['style'] = 'border:1px solid rgb(50, 50, 185);'
+                file_name_paragraph['style'] += 'background-color: rgb(50, 50, 185);'
 
-def check_common_path(dirs, soup):
-    catalog = soup.find_all('ul', class_="catalog")[0]
+            file_container['class'] += ' file'
 
-    existing_directories = catalog.find_all('div', class_='directory')
-    if len(existing_directories) == 0:
-        return (None, None)
+            content['style'] = 'margin:0;'
+
+
+            file_container.append(file_name_paragraph)
+            file_container.append(content)
+            file_container['style'] += 'padding:0; margin: 10px; width:140ch;'
+            question_file_content.append(file_container)
+
+    if "md" in dictionary.keys():
+        for file in dictionary["md"]:    
+            md_file_path = os.path.join(source_dir, file)
+            parse_readme(md_file_path, question_file_content)
+
+    body.append(question_file_content)
+    html.append(body)
     
-    common_path_max = '.'
-    path_to_create_max = '.'
-    for existing_path in SOURCES_STRUCTURE:
-        common_path = os.path.commonpath([existing_path, dirs])
-        path_to_create = os.path.relpath(dirs, common_path)
-
-        if len(common_path) > len(common_path_max):
-            common_path_max = common_path
-        if len(path_to_create) > len(path_to_create_max):
-            path_to_create_max = path_to_create
-
-    
-    # print(common_path_max, path_to_create_max)
-    sub_dirs = os.path.split(common_path_max)
-    # get this path !
-    parent_directories = catalog.findChildren('div', class_='directory', recursive=False)
-
-    current_level_directories = catalog.findChildren('div', class_='directory', recursive=False)
-    last_parent = None
-    for sub_dir in sub_dirs:
-        for parent in current_level_directories:
-            directory_title = parent.findChildren('div', class_='directory_title', resursive=False)[0]
-            if directory_title.string == sub_dir:
-                current_level_directories = parent.findChildren('div', class_='directory', resursive=False)
-                last_parent = parent
-                break
-    
-    return (last_parent, path_to_create_max)
+    with open(html_file_path, "w") as html_file:
+        html_file.write(html.prettify())
 
 
-def create_sub_directories(resulting_html_structure_dir, file_path, soup):
-    catalog = soup.find_all('ul', class_="catalog")[0]
+def create_question_hierarchy(parent_dir, dir_name, dictionary, question_path, cpp_sources_dir):
+    if is_question(dictionary):
+        question_path += ".html"
+        directory_content = parent_dir.find('ul', class_='directory-content')
+        # directory_content['style'] += 'display:none;'
+        if directory_content:
+            directory_content.append(create_question(dir_name, question_path))
 
-    dirs = os.path.relpath(os.path.dirname(file_path), resulting_html_structure_dir)
-
-    (common_parent, path_to_create) = check_common_path(dirs, soup)
-    if path_to_create == None:
-        path_to_create = dirs
-    
-
-    questions = soup.new_tag('div')
-    questions['class'] = 'questions'
-
-    print(file_path)
-    if path_to_create == "." and common_parent:
-        print(dirs)
-        print(common_parent.prettify())
-        ul = common_parent.findChildren('ul', resursive=False)[0]
-        ul.append(questions)
-
-        return
-
-    child_directory = None
-    file_containing_directory = None
-
-    SOURCES_STRUCTURE.append(dirs)
-
-    while path_to_create:
-        current_dir = os.path.basename(path_to_create)
-        path_to_create = os.path.dirname(path_to_create)
-        directory = soup.new_tag('div')
-        directory['class'] = 'directory'
-
-        directory_title = soup.new_tag('div')
-        directory_title['class'] = 'directory_title'
-        directory_title.string = current_dir
-        directory.append(directory_title)
-
-        ul = soup.new_tag('ul')
-        directory.append(ul)
-
-        if child_directory:
-            ul.append(child_directory)
-
-        if child_directory == None:
-            file_containing_directory = directory
-        
-        child_directory = directory
-
-    if common_parent:
-        ul = common_parent.findChildren('ul')[0]
-        ul.append(child_directory)
+        generate_question_html(question_path, cpp_sources_dir, dictionary)
     else:
-        catalog.append(child_directory)
+        directory = create_directory(dir_name)
 
-    ul = file_containing_directory.find_all('ul')[0]
-    ul.append(questions)
+        if parent_dir['class'] == 'question-container':
+            parent_dir.append(directory)
+        else:
+            directory_content = parent_dir.find('ul', class_='directory-content')
+            directory_content.append(directory)
+        
+        for sub_dir_name in dictionary.keys():
+            create_question_hierarchy(directory, sub_dir_name, dictionary[sub_dir_name], os.path.join(question_path, sub_dir_name), cpp_sources_dir)
 
-def create_main_page(resulting_html_structure_dir):
-    main_page_path = os.path.dirname(resulting_html_structure_dir)
-    soup = BeautifulSoup(html_main_template, "html.parser")
-    catalog = soup.find_all('ul', class_="catalog")[0]
 
-    for root, dirs, files in os.walk(resulting_html_structure_dir, topdown=False):
-        first_file_in_dir = True
-        directory = None
+
+def generate_html_files(cpp_sources_dir, resulting_html_structure_dir):
+    html = soup.new_tag("html")
+    head = soup.new_tag("head")
+    script = soup.new_tag("script")
+    script.string = '''
+    function toggleDirectory(event)
+    {
+        const parentNode = event.target.parentNode;
+        let directoryContent = parentNode.getElementsByClassName("directory-content")[0];
+
+        if (directoryContent.style.display == "none") {
+            directoryContent.style.display = "block";
+        } else {
+            directoryContent.style.display = "none";
+        }
+    }
+    '''
+    head.append(script)
+    html.append(head)
+
+
+    question_container = soup.new_tag("ul")
+    question_container['class'] = 'question-container'
+    question_container['style'] = 'margin-left:1em;'
+
+    main_directories = SOURCES_STRUCTURE.keys()
+
+    starting_path = resulting_html_structure_dir
+    for dir_name in main_directories:
+        question_path = os.path.join(starting_path, dir_name)
+        create_question_hierarchy(question_container, dir_name, SOURCES_STRUCTURE[dir_name], question_path, cpp_sources_dir)
+
+    body = soup.new_tag("body")
+    body.append(question_container)
+    html.append(body)
+
+    return html
+
+
+def save_html_file_content(question_container):
+    with open("index.html", "w") as html_file:
+        html_file.write(question_container.prettify())
+
+
+def create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_structure_dir):
+    for root, dirs, files in os.walk(cpp_sources_dir, topdown=True):
         for name in files:
             file_path = os.path.join(root, name)
+            rel_path = os.path.relpath(file_path, cpp_sources_dir)
+            update_sources_structure(rel_path)
 
-            question_rel_path = os.path.relpath(file_path, main_page_path)
-            directory_name = os.path.basename(os.path.dirname(question_rel_path))
+    question_container = generate_html_files(cpp_sources_dir, resulting_html_structure_dir)
 
-            question = soup.new_tag("div")
-            question['class'] = 'q'
-
-            question_link = soup.new_tag('a')
-            question_link['class'] = 'question-link'
-            question_link['href'] = question_rel_path
-            question_link.string = os.path.basename(file_path)  
-
-            question.append(question_link)              
-
-            if first_file_in_dir:
-                create_sub_directories(resulting_html_structure_dir, file_path, soup)
-
-
-            questions = soup.find_all('div', class_='questions')[-1]
-            questions.append(question)
-
-            first_file_in_dir = False
-    
-    index_html = os.path.join(main_page_path, "index.html")
-    with open(index_html, "w") as index:
-        index.write(soup.prettify())
+    save_html_file_content(question_container)
 
 
 if __name__ == "__main__":
     cpp_sources_dir = SRC_DIR
     resulting_html_structure_dir = HTML_DIR
 
-    if len(sys.argv) == 3:
-        cpp_sources_dir = sys.argv[1]
-        resulting_html_structure_dir = sys.argv[2]
-    elif len(sys.argv) != 1:
-        print("Wrong number of arguments! parser.py [cpp_sources_dir] [resulting_html_structure_dir]")
-        exit(-1)
-    
     create_HTML_structure_for_cpp_projects(cpp_sources_dir, resulting_html_structure_dir)
-    create_main_page(resulting_html_structure_dir)
-
